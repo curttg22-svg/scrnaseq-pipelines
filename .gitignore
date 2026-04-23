@@ -47,3 +47,17 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# Large data and result files — reproducible from scripts, not tracked in git
+*.rds
+*.RDS
+*.rda
+*.h5
+*.h5ad
+*.loom
+*.csv.gz
+*.txt.gz
+*.Matrix.txt.gz
+**/results/*.pdf
+**/results/*.png
+**/data/raw/
