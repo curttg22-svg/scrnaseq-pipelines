@@ -96,10 +96,13 @@ make_volcano <- function(de, title, goi = GOI) {
   de$sig[de$p_val_adj < 0.05 & de$avg_log2FC < -0.5] <- "Down"
   de$sig <- factor(de$sig, levels = c("Up","Down","NS"))
 
-  # Label top 10 up + top 10 down + any GOI hits
-  top_up   <- de |> filter(sig == "Up")   |> arrange(p_val_adj) |> head(10)
-  top_down <- de |> filter(sig == "Down") |> arrange(p_val_adj) |> head(10)
-  goi_hits <- de |> filter(gene %in% goi, p_val_adj < 0.05)
+  # Only label clean gene symbols — exclude Trinity IDs (contain digits after dash)
+  de_named <- de |> filter(!grepl("^c[0-9]|-g[0-9]|-i[0-9]|\\^", gene))
+
+  # Top 8 up + top 8 down by fold-change among named genes + significant GOI
+  top_up   <- de_named |> filter(sig == "Up")   |> arrange(desc(avg_log2FC)) |> head(8)
+  top_down <- de_named |> filter(sig == "Down")  |> arrange(avg_log2FC)      |> head(8)
+  goi_hits <- de       |> filter(gene %in% goi, p_val_adj < 0.05)
   label_df <- bind_rows(top_up, top_down, goi_hits) |> distinct(gene, .keep_all = TRUE)
 
   ggplot(de, aes(x = avg_log2FC, y = -log10(p_val_adj + 1e-300),
