@@ -13,6 +13,7 @@ dir.create(raw_dir,  showWarnings = FALSE, recursive = TRUE)
 dir.create(anno_dir, showWarnings = FALSE, recursive = TRUE)
 
 # Sample map: GEO accession -> local folder name
+# Original samples (GSM5045xxx series)
 SAMPLES <- c(
   "GSM5045045" = "Xen_BL0dpa",
   "GSM5045046" = "Xen_BL3dpa",
@@ -21,32 +22,59 @@ SAMPLES <- c(
   # GSM5045049 (axolotl rep2) intentionally excluded — severe batch effect
 )
 
-message("Fetching GSE165901 supplementary file list...")
-gse <- getGEO("GSE165901", GSEMatrix = FALSE)
+# Extended Xenopus regeneration timepoints (GSM5057xxx series)
+# Added to capture late regeneration window (14-52 dpa) where Hedgehog
+# pathway GOI are expected to show activity if present in Xenopus.
+# Axolotl samples from this series excluded — CT fate-map enriched (~97%
+# mesenchymal), not suitable for cell-type-balanced cross-species comparison.
+SAMPLES_EXTENDED <- c(
+  "GSM5057665" = "Xen_BL14dpa",
+  "GSM5057660" = "Xen_Pool_BL14_20_52dpa"
+)
 
-for (acc in names(SAMPLES)) {
-  dest <- file.path(raw_dir, SAMPLES[acc])
-  dir.create(dest, showWarnings = FALSE)
+# Set to TRUE to also download the original samples (skip if already present)
+DOWNLOAD_ORIGINAL <- FALSE
 
-  message("\nDownloading ", acc, " -> ", dest)
-  gsm <- getGEO(acc)
+download_samples <- function(sample_map, raw_dir) {
+  for (acc in names(sample_map)) {
+    dest <- file.path(raw_dir, sample_map[acc])
 
-  # GEO supplementary files for 10x MTX samples
-  supp_files <- getGEOSuppFiles(acc, makeDirectory = FALSE, baseDir = dest)
+    # Skip if already downloaded
+    if (all(file.exists(file.path(dest, c("barcodes.tsv.gz",
+                                           "features.tsv.gz",
+                                           "matrix.mtx.gz"))))) {
+      message("  Already present, skipping: ", sample_map[acc])
+      next
+    }
 
-  # Rename to standard 10x names if needed
-  dl_files <- rownames(supp_files)
-  for (f in dl_files) {
-    bname <- basename(f)
-    if (grepl("matrix", bname, ignore.case = TRUE))
-      file.rename(f, file.path(dest, "matrix.mtx.gz"))
-    if (grepl("barcode", bname, ignore.case = TRUE))
-      file.rename(f, file.path(dest, "barcodes.tsv.gz"))
-    if (grepl("feature|gene", bname, ignore.case = TRUE))
-      file.rename(f, file.path(dest, "features.tsv.gz"))
+    dir.create(dest, showWarnings = FALSE)
+    message("\nDownloading ", acc, " -> ", dest)
+
+    supp_files <- getGEOSuppFiles(acc, makeDirectory = FALSE, baseDir = dest)
+
+    dl_files <- rownames(supp_files)
+    for (f in dl_files) {
+      bname <- basename(f)
+      if (grepl("matrix", bname, ignore.case = TRUE))
+        file.rename(f, file.path(dest, "matrix.mtx.gz"))
+      if (grepl("barcode", bname, ignore.case = TRUE))
+        file.rename(f, file.path(dest, "barcodes.tsv.gz"))
+      if (grepl("feature|gene", bname, ignore.case = TRUE))
+        file.rename(f, file.path(dest, "features.tsv.gz"))
+    }
+    message("  Done: ", paste(list.files(dest), collapse = ", "))
   }
-  message("  Done: ", paste(list.files(dest), collapse = ", "))
 }
+
+message("Fetching GSE165901 supplementary file list...")
+
+if (DOWNLOAD_ORIGINAL) {
+  message("\n--- Original samples ---")
+  download_samples(SAMPLES, raw_dir)
+}
+
+message("\n--- Extended Xenopus regeneration timepoints ---")
+download_samples(SAMPLES_EXTENDED, raw_dir)
 
 message("\n=== Download complete ===")
 message("Now download the axolotl GTF annotation manually:")
