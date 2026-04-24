@@ -46,23 +46,41 @@ GOI <- c(
   "C3","LDLR","ALOX15B","MSMO1","CYP51A1","FDPS"
 )
 
-# Same harmonization map as script 06
-CT_HARMONIZE <- data.frame(
-  intact_label = c(
-    "SSCs","Fibroblast","Tcells","Early_B","RBCs","Myeloid",
-    "BasalEpidermis","Intermediate_epidermis","Proliferating_Epidermis",
-    "Epidermal_Langerhans"
-  ),
-  eb_mb_label = c(
-    "SSC","Fibroblast-like_blastema_","T_cell","Early_B_cell","Erythrocyte",
-    "Recruited_Macrophage","Basal WE","Intermediate_WE_","Intermediate_WE_",
-    "Dendritic_Cell"
-  ),
-  harmonized = c(
-    "SSC_fibroblast","Fibroblast_blastema","T_cell","Early_B_cell",
-    "Erythrocyte_RBC","Myeloid_macrophage","Basal_epidermis",
-    "Intermediate_epidermis","Intermediate_epidermis","Dendritic_Langerhans"
-  ),
+# Harmonization maps — each dataset uses different naming conventions.
+# Trailing spaces in EB/MB labels are present in the original SCP data.
+
+CT_INTACT <- data.frame(
+  label      = c("SSCs","Fibroblast","Tcells","Early_B","RBCs","Myeloid",
+                 "BasalEpidermis","Intermediate_epidermis",
+                 "Proliferating_Epidermis","Epidermal_Langerhans"),
+  harmonized = c("SSC_fibroblast","Fibroblast_blastema","T_cell","Early_B_cell",
+                 "Erythrocyte_RBC","Myeloid_macrophage","Basal_epidermis",
+                 "Intermediate_epidermis","Intermediate_epidermis",
+                 "Dendritic_Langerhans"),
+  stringsAsFactors = FALSE
+)
+
+CT_EB <- data.frame(
+  label      = c("Fibroblast-like blastema ","Erythrocyte ","T cells",
+                 "Early B cells","Macrophages","Basal wound epidermis",
+                 "Myogenic blastemaa","Neutrophils","Endothelial cells",
+                 "Tenocyte"),
+  harmonized = c("Fibroblast_blastema","Erythrocyte_RBC","T_cell",
+                 "Early_B_cell","Myeloid_macrophage","Basal_epidermis",
+                 "Myogenic_blastema","Neutrophil","Endothelial",
+                 "Tenocyte"),
+  stringsAsFactors = FALSE
+)
+
+CT_MB <- data.frame(
+  label      = c("Fibroblast-like blastema ","Erythrocyte","T cell",
+                 "B cell","Macrophage","Basal WE ","Intermediate WE ",
+                 "Myogenic blastema","Neutrophil","Endothelial",
+                 "Pericyte","Schwann","SSC"),
+  harmonized = c("Fibroblast_blastema","Erythrocyte_RBC","T_cell",
+                 "B_cell","Myeloid_macrophage","Basal_epidermis",
+                 "Intermediate_epidermis","Myogenic_blastema","Neutrophil",
+                 "Endothelial","Pericyte","Schwann","SSC_fibroblast"),
   stringsAsFactors = FALSE
 )
 
@@ -74,27 +92,21 @@ message("Loading axo_integrated.rds...")
 axo <- readRDS(file.path(results_dir, "axo_integrated.rds"))
 axo <- JoinLayers(axo)
 
-# Assign harmonized cell type labels
+# Assign harmonized cell type labels using dataset-specific maps
 axo$ct_harmonized <- NA_character_
 
-# Intact labels
-for (i in seq_len(nrow(CT_HARMONIZE))) {
-  idx <- axo$timepoint == "Intact" &
-         axo$paper_cluster == CT_HARMONIZE$intact_label[i]
-  axo$ct_harmonized[idx] <- CT_HARMONIZE$harmonized[i]
+apply_map <- function(axo, tp, map) {
+  for (i in seq_len(nrow(map))) {
+    idx <- axo$timepoint == tp &
+           trimws(axo$paper_cluster) == trimws(map$label[i])
+    axo$ct_harmonized[idx] <- map$harmonized[i]
+  }
+  axo
 }
-# EB labels
-for (i in seq_len(nrow(CT_HARMONIZE))) {
-  idx <- axo$timepoint == "EB" &
-         axo$paper_cluster == CT_HARMONIZE$eb_mb_label[i]
-  axo$ct_harmonized[idx] <- CT_HARMONIZE$harmonized[i]
-}
-# MB labels
-for (i in seq_len(nrow(CT_HARMONIZE))) {
-  idx <- axo$timepoint == "MB" &
-         axo$paper_cluster == CT_HARMONIZE$eb_mb_label[i]
-  axo$ct_harmonized[idx] <- CT_HARMONIZE$harmonized[i]
-}
+
+axo <- apply_map(axo, "Intact", CT_INTACT)
+axo <- apply_map(axo, "EB",     CT_EB)
+axo <- apply_map(axo, "MB",     CT_MB)
 
 message("Harmonized cell type counts per timepoint:")
 print(table(axo$ct_harmonized, axo$timepoint)[,
@@ -203,7 +215,7 @@ make_exp_volcano <- function(de, title, goi = GOI) {
       name = NULL
     ) +
     labs(title    = title,
-         subtitle = paste0("EXPLORATORY — single sample, no replicates",
+         subtitle = paste0("EXPLORATORY - single sample, no replicates",
                            "\nUp: ", sum(de$sig == "Up"),
                            "  |  Down: ", sum(de$sig == "Down"),
                            "  |  p_adj<0.01, |log2FC|>1"),

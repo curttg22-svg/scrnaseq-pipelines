@@ -72,13 +72,23 @@ all_genes <- Reduce(union, list(
 ))
 message("Total unique genes across all studies: ", length(all_genes))
 
-# Extract embedded UniProt gene symbol from sanitized Trinity ID
+# Extract embedded UniProt gene symbol from sanitized Trinity ID.
 # Sanitized format: ...^sp-ACCESSION-GENESYM-SPECIES^...
+# Multi-hit IDs (e.g. THAP5-CHICK^sp-...-THAP8-HUMAN^) require preferring
+# the _HUMAN species entry over other species to avoid mislabeling ~32% of IDs.
 extract_embedded_symbol <- function(ids) {
-  str_extract(ids, "(?<=-)[A-Z][A-Z0-9]{1,}(?=-[A-Z]{2,5}\\^)")
+  # First pass: try to find a _HUMAN-suffixed symbol
+  human_sym <- str_match(ids, "-([A-Z][A-Z0-9]{1,})-HUMAN\\^")[, 2]
+  # Second pass: fall back to first species hit for non-human annotations
+  any_sym   <- str_extract(ids, "(?<=-)[A-Z][A-Z0-9]{1,}(?=-[A-Z]{2,5}\\^)")
+  # Prefer HUMAN; use any_sym only where human match is absent
+  ifelse(!is.na(human_sym), human_sym, any_sym)
 }
 
 embedded_syms <- extract_embedded_symbol(all_genes)
+n_human   <- sum(!is.na(str_match(all_genes, "-[A-Z]+-HUMAN\\^")[,1]))
+n_any     <- sum(!is.na(embedded_syms))
+message("  HUMAN-species hits: ", n_human, " | Total embedded: ", n_any)
 embedded_map <- data.frame(
   trinity_id  = all_genes,
   gene_symbol = embedded_syms,

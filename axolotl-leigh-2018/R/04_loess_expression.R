@@ -194,18 +194,17 @@ for (g in goi_in_sc) {
     distinct(ct_num, ct_label) |>
     arrange(ct_num)
 
-  # Left panel: LOESS mean expression
+  # Left panel: mean expression per cell type per timepoint
+  # Connected dot plot — cell type ordering is categorical, not continuous,
+  # so LOESS smoothing over integer positions fabricates trends between
+  # unrelated cell types and is not appropriate here.
   px <- ggplot(df, aes(x = ct_num, y = mean_expr,
-                        color = timepoint, fill = timepoint)) +
-    geom_smooth(method = "loess", span = 0.6, se = TRUE,
-                level = 0.80, alpha = 0.08, linewidth = 1.0) +
-    stat_summary(fun = mean, geom = "point", size = 1.8, alpha = 0.7) +
+                        color = timepoint, group = timepoint)) +
+    geom_line(linewidth = 0.6, alpha = 0.7) +
+    geom_point(size = 1.8, alpha = 0.85) +
     scale_color_manual(values = TIMEPOINT_COLORS,
                        name  = "Timepoint",
                        labels = TIMEPOINT_ORDER) +
-    scale_fill_manual(values  = TIMEPOINT_COLORS,
-                      name   = "Timepoint",
-                      labels = TIMEPOINT_ORDER) +
     scale_x_continuous(
       breaks = ct_label_vec$ct_num,
       labels = ct_label_vec$ct_label,
@@ -215,18 +214,14 @@ for (g in goi_in_sc) {
          y     = "Mean log-norm. expr.") +
     base_theme + leg_theme
 
-  # Right panel: percent expressing
+  # Right panel: percent expressing (connected dot plot, same rationale)
   pp <- ggplot(df, aes(x = ct_num, y = pct_expr,
-                        color = timepoint, fill = timepoint)) +
-    geom_smooth(method = "loess", span = 0.6, se = TRUE,
-                level = 0.80, alpha = 0.08, linewidth = 1.0) +
-    stat_summary(fun = mean, geom = "point", size = 1.8, alpha = 0.7) +
+                        color = timepoint, group = timepoint)) +
+    geom_line(linewidth = 0.6, alpha = 0.7) +
+    geom_point(size = 1.8, alpha = 0.85) +
     scale_color_manual(values = TIMEPOINT_COLORS,
                        name  = "Timepoint",
                        labels = TIMEPOINT_ORDER) +
-    scale_fill_manual(values  = TIMEPOINT_COLORS,
-                      name   = "Timepoint",
-                      labels = TIMEPOINT_ORDER) +
     scale_x_continuous(
       breaks = ct_label_vec$ct_num,
       labels = ct_label_vec$ct_label,

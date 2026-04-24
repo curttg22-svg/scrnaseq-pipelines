@@ -29,8 +29,19 @@ xen_pool  <- load_10x(file.path("data","raw","Xen_Pool_BL7_10_14dpa"),"Xen_pool"
 # 2. PER-SAMPLE QC
 # =============================================================================
 
-add_mito <- function(seu, pattern = "^mt-") {
-  seu[["percent.mt"]] <- PercentageFeatureSet(seu, pattern = pattern)
+add_mito <- function(seu) {
+  # Xenopus mito genes are ALL-CAPS (ND1-6, CYTB, COX1-3, ATP6/8)
+  # Try uppercase first, fall back to lowercase, set 0 if none found
+  mt_genes <- grep("^MT-|^ND[0-9]|^CYTB|^COX[0-9]|^ATP[68]",
+                   rownames(seu), value = TRUE, ignore.case = FALSE)
+  if (length(mt_genes) == 0)
+    mt_genes <- grep("^mt-", rownames(seu), value = TRUE, ignore.case = FALSE)
+  if (length(mt_genes) > 0) {
+    seu[["percent.mt"]] <- PercentageFeatureSet(seu, features = mt_genes)
+  } else {
+    seu[["percent.mt"]] <- 0
+    message("  No mito genes found for ", seu@project.name, " — percent.mt set to 0")
+  }
   seu
 }
 
@@ -63,7 +74,10 @@ xen_0dpa$timepoint <- "0dpa";     xen_0dpa$sample <- "Xen_BL0dpa"
 xen_3dpa$timepoint <- "3dpa";     xen_3dpa$sample <- "Xen_BL3dpa"
 xen_pool$timepoint <- "7-14dpa";  xen_pool$sample <- "Xen_Pool_7-14dpa"
 
-for (s in list(xen_0dpa, xen_3dpa, xen_pool)) s$species <- "Xenopus"
+# Direct assignment required — R for-loop copies don't write back to originals
+xen_0dpa$species <- "Xenopus"
+xen_3dpa$species <- "Xenopus"
+xen_pool$species <- "Xenopus"
 
 # =============================================================================
 # 4. MERGE — no Harmony needed; timepoint separation is biological
