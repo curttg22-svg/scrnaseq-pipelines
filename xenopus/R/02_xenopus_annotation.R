@@ -74,33 +74,33 @@ xen_merged$cell_type <- Idents(xen_merged)
 # =============================================================================
 
 canonical_markers <- c(
-  # CT / stromal
-  "col1a1.L","col1a1.S","vim.L",
-  # Cartilage
-  "col2a1.L","sox9.L",
-  # Epithelial
-  "krt8.L","krt18.L","epcam.L",
+  # CT / stromal — both homeologs present; combined signal strengthens distinction
+  "col1a1.L","col1a1.S","vim.L","vim.S",
+  # Cartilage — both homeologs present
+  "col2a1.L","col2a1.S","sox9.L","sox9.S",
+  # Epithelial — both homeologs present
+  "krt8.L","krt8.S","krt18.L","krt18.S","epcam.L","epcam.S",
   # Immune
-  "aif1.L","cd68.L","ptprc.L",    # macrophage
-  "mpx.L","s100a8.L",              # neutrophil
-  "cd79a.L",                       # B cell
-  # Vascular
-  "pecam1.L","cdh5.L",
-  # Muscle
-  "acta2.L","tagln.L",
-  # Erythrocyte — included to verify clusters 14/16 (col1a1 signal in Erythrocyte row)
-  "hba1.L","hbb.S",
-  # Proliferating
-  "mki67.L","top2a.L",
-  # Neural
-  "sox10.L","s100b.L"
+  "ptprc.L",                        # macrophage/pan-immune (.S absent from object)
+  "s100a8.L",                       # neutrophil (aif1/cd68/mpx absent from object)
+  "cd79a.L",                        # B cell
+  # Vascular — both homeologs present for pecam1
+  "pecam1.L","pecam1.S","cdh5.L",
+  # Muscle — both homeologs present
+  "acta2.L","acta2.S","tagln.L","tagln.S",
+  # Erythrocyte — both homeologs; hba1.S included to resolve cluster 14/16 ambiguity
+  "hba1.L","hba1.S",
+  # Proliferating — both where present (top2a.S absent from object)
+  "mki67.L","mki67.S","top2a.L",
+  # Neural — both homeologs present
+  "sox10.L","sox10.S","s100b.L"
 )
 
 # Keep only markers present in the object
 canonical_markers <- intersect(canonical_markers, rownames(xen_merged))
 
 pdf(file.path(results_dir, "xenopus_canonical_marker_dotplot.pdf"),
-    width = max(10, length(canonical_markers) * 0.55 + 3), height = 8)
+    width = max(12, length(canonical_markers) * 0.5 + 3), height = 9)
 print(
   DotPlot(xen_merged, features = canonical_markers, group.by = "cell_type",
           dot.scale = 6, col.min = 0) +
