@@ -3,7 +3,7 @@
 # Input:  results/xen_merged.rds
 # Output: results/xen_merged.rds (updated with cell_type metadata)
 #
-# 20 clusters at resolution=0.3 (five timepoints: 0/3/7-14/14/14-52 dpa,
+# 22 clusters at resolution=0.3 (five timepoints: 0/3/7-14/14/14-52 dpa,
 # Harmony-integrated across two GEO batches: GSM5045xxx + GSM5057xxx)
 #
 # Annotation strategy: marker-based verification via canonical dotplot.
@@ -140,3 +140,61 @@ saveRDS(xen_merged, file.path(results_dir, "xen_merged.rds"))
 message("Saved results/xen_merged.rds with cell_type metadata")
 message("Cell type counts:")
 print(table(xen_merged$cell_type))
+
+# =============================================================================
+# 4. GOI MODULE SCORE ON UMAP
+# Same gene list as 06_goi_visualization.R. Homeolog-aware lookup finds
+# .L / .S variants present in the object so no manual suffix matching needed.
+# =============================================================================
+
+GOI <- c(
+  "GLI1","PTCH1","PTCH2","SHH","IHH","DHH",
+  "GDF5","MSX1","SALL1","GREM1",
+  "FREM1","CYTL1","CLDN5","IL11","FGFBP1",
+  "C3","LDLR","ALOX15B","MSMO1","CYP51A1","FDPS"
+)
+
+find_xen_genes <- function(symbols, obj) {
+  all_genes <- rownames(obj)
+  found <- c()
+  for (g in symbols) {
+    hits <- grep(paste0("^", g, "(\\.L|\\.S|\\.L\\.[0-9]+|\\.S\\.[0-9]+)?$"),
+                 all_genes, ignore.case = TRUE, value = TRUE)
+    found <- c(found, hits)
+  }
+  unique(found)
+}
+
+xen_goi <- find_xen_genes(GOI, xen_merged)
+message("GOI homeologs found in object: ", length(xen_goi))
+
+if (length(xen_goi) > 0) {
+  xen_merged <- AddModuleScore(xen_merged, features = list(xen_goi),
+                               name = "GOI_score")
+
+  pdf(file.path(results_dir, "GOI_module_score_UMAP.pdf"), width = 8, height = 6)
+  print(
+    FeaturePlot(xen_merged, features = "GOI_score1",
+                reduction = "umap_harmony", pt.size = 0.3, order = TRUE) +
+      scale_color_gradient2(low = "lightgrey", mid = "#FDAE61",
+                            high = "#B2182B", midpoint = 0) +
+      ggtitle("Xenopus - GOI module score (Hedgehog + patterning)") +
+      theme(legend.title = element_text(size = 8))
+  )
+  dev.off()
+
+  # Violin: module score by cell type — shows which cell types drive the signal
+  pdf(file.path(results_dir, "GOI_module_score_violin.pdf"), width = 12, height = 5)
+  print(
+    VlnPlot(xen_merged, features = "GOI_score1", group.by = "cell_type",
+            pt.size = 0) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+            legend.position = "none") +
+      ggtitle("GOI module score by cell type")
+  )
+  dev.off()
+
+  message("GOI module score figures saved")
+} else {
+  message("No GOI homeologs found in object — module score skipped")
+}
