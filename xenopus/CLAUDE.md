@@ -1,8 +1,11 @@
 # Xenopus Limb Regeneration scRNA-seq Pipeline
 
 ## Overview
-Five-timepoint Xenopus laevis limb regeneration dataset (0, 3, 7-14, 14, 14-52 dpa).
-Two GEO batches (GSM5045xxx + GSM5057xxx) integrated with Harmony by sample.
+Lin et al. 2021 (GSE165901) — Xenopus laevis limb regeneration, two experimental groups:
+  BL   (blastema): froglet post-amputation, NON-regenerative — 0, 3, 7-14, 14, 14-52 dpa
+  LBst (limb bud stage): tadpole NF stages 50-52, REGENERATIVE window
+Ten samples total across two GEO submissions, integrated with Harmony by sample.
+Excluded: GSM5057666 (mixed LBst54+BL0dpa pool), GSM5057667 (transplant experiment).
 
 ## Annotation Strategy
 Cell type labels are assigned by **marker-based verification**, not by assumed cluster order.

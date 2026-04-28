@@ -149,13 +149,18 @@ pseudobulk_axolotl_leigh <- function(rds_path) {
 }
 
 # --- Xenopus laevis Lin 2021 (pseudotetraploid, .L/.S homeologs) ------------
+#
+# The object contains two experimental groups (set in 01_xenopus_qc_clustering.R):
+#   condition == "BL"   : froglet post-amputation, non-regenerative (dpa labels)
+#   condition == "LBst" : tadpole limb bud stage, regenerative (NF stage labels)
+# Each group gets its own column prefix so they appear as separate heatmap facets:
+#   LinBL_   -> "Xenopus froglet (Lin 2021)"
+#   LinLBst_ -> "Xenopus tadpole (Lin 2021)"
 
 pseudobulk_xenopus_lin <- function(rds_path) {
   message("Computing pseudobulk: Xenopus (Lin 2021)...")
-  xen    <- JoinLayers(readRDS(rds_path))
-  expr   <- GetAssayData(xen, layer = "data")
-  tp_order <- c("0dpa", "3dpa", "7-14dpa", "14dpa", "14-52dpa")
-  tp_factor <- xen$timepoint
+  xen  <- JoinLayers(readRDS(rds_path))
+  expr <- GetAssayData(xen, layer = "data")
 
   # Sum .L and .S homeologs into one base-gene symbol per cell using a sparse
   # indicator matrix multiply. Much faster than row-by-row aggregation.
@@ -174,8 +179,20 @@ pseudobulk_xenopus_lin <- function(rds_path) {
   )
   expr_summed <- t(indicator) %*% expr   # base genes x cells
 
-  pb <- .mean_per_tp(expr_summed, tp_factor, tp_order, prefix = "Lin")
-  as.matrix(pb)   # rownames already HGNC-compatible uppercase base symbols
+  # --- Froglet BL (non-regenerative) ---
+  bl_idx    <- which(xen$condition == "BL")
+  bl_order  <- c("0dpa","3dpa","7-14dpa","14dpa","14-52dpa")
+  bl_factor <- factor(xen$timepoint[bl_idx], levels = bl_order)
+  pb_bl <- .mean_per_tp(expr_summed[, bl_idx], bl_factor, bl_order, prefix = "LinBL")
+
+  # --- Tadpole LBst (regenerative) ---
+  lb_idx    <- which(xen$condition == "LBst")
+  lb_order  <- c("NF50","NF51","NF52")
+  lb_factor <- factor(xen$timepoint[lb_idx], levels = lb_order)
+  pb_lb <- .mean_per_tp(expr_summed[, lb_idx], lb_factor, lb_order, prefix = "LinLBst")
+
+  message("  BL cells: ", length(bl_idx), " | LBst cells: ", length(lb_idx))
+  as.matrix(cbind(pb_bl, pb_lb))
 }
 
 # --- Mouse digit tip (placeholder — fill in when dataset is available) ------
@@ -260,10 +277,11 @@ message("Saved bulk_scrna_correlation_matrix.csv")
 .prefix_to_species <- function(col_names) {
   prefixes <- sub("_.*", "", col_names)
   species_labels <- c(
-    Leigh  = "Axolotl (Leigh 2018)",
-    Gerber = "Axolotl (Gerber 2018)",
-    Lin    = "Xenopus laevis (Lin 2021)",
-    Mouse  = "Mouse digit tip"
+    Leigh   = "Axolotl (Leigh 2018)",
+    Gerber  = "Axolotl (Gerber 2018)",
+    LinBL   = "Xenopus froglet (Lin 2021)",
+    LinLBst = "Xenopus tadpole (Lin 2021)",
+    Mouse   = "Mouse digit tip"
   )
   ifelse(prefixes %in% names(species_labels),
          species_labels[prefixes], prefixes)

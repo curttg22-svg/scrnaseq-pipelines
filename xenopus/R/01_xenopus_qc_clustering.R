@@ -1,19 +1,35 @@
 # =============================================================================
 # 01 — Xenopus laevis: QC, merge, normalise, cluster, UMAP
-# Input:  data/raw/Xen_BL0dpa/, Xen_BL3dpa/, Xen_Pool_BL7_10_14dpa/,
-#                  Xen_BL14dpa/, Xen_Pool_BL14_20_52dpa/
+#
+# Input:  data/raw/  (10 samples — run 00_download_data.R first)
 # Output: results/xen_merged.rds
 #
-# Five timepoints spanning 0-52 dpa:
-#   0dpa     — intact/pre-regen baseline
-#   3dpa     — early wound response
-#   7-14dpa  — early blastema (pooled)
-#   14dpa    — mid-blastema (standalone replicate)
-#   14-52dpa — late blastema / maturation (pooled)
+# Two experimental groups from Lin et al. 2021 (GSE165901):
 #
-# The 14 dpa standalone and 14-20-52 dpa pool extend the original three
-# samples to capture late-stage GOI (Hedgehog pathway, patterning genes)
-# that are expected to activate at blastema specification stages.
+#   BL  (blastema, NON-regenerative froglet post-amputation):
+#     Xen_BL0dpa              — 0 dpa     (GSM5045045)
+#     Xen_FACS_BL0dpa         — 0 dpa     (GSM5057655, FACS-sorted, same-animal supplement)
+#     Xen_BL3dpa              — 3 dpa     (GSM5045046)
+#     Xen_FACS_BL3dpa         — 3 dpa     (GSM5057656, FACS-sorted, same-animal supplement)
+#     Xen_Pool_BL7_10_14dpa   — 7-14 dpa  (GSM5045047, pooled)
+#     Xen_BL14dpa             — 14 dpa    (GSM5057665, standalone)
+#     Xen_Pool_BL14_20_52dpa  — 14-52 dpa (GSM5057660, pooled)
+#
+#   LBst (limb bud stage, REGENERATIVE tadpole):
+#     Xen_LBst50              — NF stage 50 (GSM5057657)
+#     Xen_LBst51              — NF stage 51 (GSM5057658)
+#     Xen_LBst52              — NF stage 52 (GSM5057659)
+#
+# Metadata columns added here:
+#   condition : "BL" (froglet, non-regenerative) | "LBst" (tadpole, regenerative)
+#   timepoint : "0dpa","3dpa","7-14dpa","14dpa","14-52dpa" for BL;
+#               "NF50","NF51","NF52" for LBst
+#   sample    : individual library name (used by Harmony for batch correction)
+#   species   : "Xenopus"
+#
+# Excluded (see 00_download_data.R for rationale):
+#   GSM5057666  Xen_Pool_LBst54_BL0dpa  — mixed regen + non-regen library
+#   GSM5057667  Xen_Transplant           — transplant experiment
 # =============================================================================
 
 library(Seurat)
@@ -24,7 +40,21 @@ library(patchwork)
 results_dir <- "results"
 dir.create(results_dir, showWarnings = FALSE)
 
-TIMEPOINT_ORDER <- c("0dpa","3dpa","7-14dpa","14dpa","14-52dpa")
+# Ordered factor levels — BL timepoints first (dpa), then LBst (NF stage)
+BL_ORDER   <- c("0dpa","3dpa","7-14dpa","14dpa","14-52dpa")
+LBST_ORDER <- c("NF50","NF51","NF52")
+TIMEPOINT_ORDER <- c(BL_ORDER, LBST_ORDER)
+
+TIMEPOINT_COLORS <- c(
+  "0dpa"      = "#37474F",  # BL: dark grey-blue
+  "3dpa"      = "#5C6BC0",  # BL: indigo
+  "7-14dpa"   = "#1565C0",  # BL: dark blue
+  "14dpa"     = "#6A1B9A",  # BL: dark purple
+  "14-52dpa"  = "#AD1457",  # BL: dark pink
+  "NF50"      = "#1B5E20",  # LBst: dark green (regenerative)
+  "NF51"      = "#388E3C",  # LBst: medium green
+  "NF52"      = "#66BB6A"   # LBst: light green
+)
 
 # =============================================================================
 # 1. LOAD RAW 10x DATA
@@ -35,24 +65,33 @@ load_10x <- function(path, project_name) {
   CreateSeuratObject(counts = counts, project = project_name, min.cells = 3)
 }
 
+raw <- file.path("data", "raw")
 message("Loading Xenopus 10x data...")
-xen_0dpa    <- load_10x(file.path("data","raw","Xen_BL0dpa"),              "Xen_0dpa")
-xen_3dpa    <- load_10x(file.path("data","raw","Xen_BL3dpa"),              "Xen_3dpa")
-xen_pool    <- load_10x(file.path("data","raw","Xen_Pool_BL7_10_14dpa"),   "Xen_pool")
-xen_14dpa   <- load_10x(file.path("data","raw","Xen_BL14dpa"),             "Xen_14dpa")
-xen_late    <- load_10x(file.path("data","raw","Xen_Pool_BL14_20_52dpa"),  "Xen_late")
 
-message(sprintf("Cells loaded — 0dpa: %d | 3dpa: %d | pool: %d | 14dpa: %d | late: %d",
-                ncol(xen_0dpa), ncol(xen_3dpa), ncol(xen_pool),
-                ncol(xen_14dpa), ncol(xen_late)))
+# BL samples
+xen_BL0      <- load_10x(file.path(raw, "Xen_BL0dpa"),             "Xen_BL0dpa")
+xen_FACS_BL0 <- load_10x(file.path(raw, "Xen_FACS_BL0dpa"),        "Xen_FACS_BL0dpa")
+xen_BL3      <- load_10x(file.path(raw, "Xen_BL3dpa"),             "Xen_BL3dpa")
+xen_FACS_BL3 <- load_10x(file.path(raw, "Xen_FACS_BL3dpa"),        "Xen_FACS_BL3dpa")
+xen_pool     <- load_10x(file.path(raw, "Xen_Pool_BL7_10_14dpa"),  "Xen_Pool_BL7_10_14dpa")
+xen_14dpa    <- load_10x(file.path(raw, "Xen_BL14dpa"),            "Xen_BL14dpa")
+xen_late     <- load_10x(file.path(raw, "Xen_Pool_BL14_20_52dpa"), "Xen_Pool_BL14_20_52dpa")
+
+# LBst samples
+xen_LBst50 <- load_10x(file.path(raw, "Xen_LBst50"), "Xen_LBst50")
+xen_LBst51 <- load_10x(file.path(raw, "Xen_LBst51"), "Xen_LBst51")
+xen_LBst52 <- load_10x(file.path(raw, "Xen_LBst52"), "Xen_LBst52")
+
+all_objs <- list(xen_BL0, xen_FACS_BL0, xen_BL3, xen_FACS_BL3, xen_pool,
+                 xen_14dpa, xen_late, xen_LBst50, xen_LBst51, xen_LBst52)
+message(sprintf("Raw cells per sample: %s",
+        paste(sapply(all_objs, ncol), collapse = " | ")))
 
 # =============================================================================
 # 2. PER-SAMPLE QC
 # =============================================================================
 
 add_mito <- function(seu) {
-  # Xenopus mito genes are ALL-CAPS (ND1-6, CYTB, COX1-3, ATP6/8)
-  # Try uppercase first, fall back to lowercase, set 0 if none found
   mt_genes <- grep("^MT-|^ND[0-9]|^CYTB|^COX[0-9]|^ATP[68]",
                    rownames(seu), value = TRUE, ignore.case = FALSE)
   if (length(mt_genes) == 0)
@@ -66,82 +105,106 @@ add_mito <- function(seu) {
   seu
 }
 
-xen_0dpa  <- add_mito(xen_0dpa)
-xen_3dpa  <- add_mito(xen_3dpa)
-xen_pool  <- add_mito(xen_pool)
-xen_14dpa <- add_mito(xen_14dpa)
-xen_late  <- add_mito(xen_late)
+all_objs <- lapply(all_objs, add_mito)
+list2env(setNames(all_objs,
+  c("xen_BL0","xen_FACS_BL0","xen_BL3","xen_FACS_BL3","xen_pool",
+    "xen_14dpa","xen_late","xen_LBst50","xen_LBst51","xen_LBst52")),
+  envir = .GlobalEnv)
 
-# QC plots before filtering — inspect before setting thresholds
+# QC violin — inspect before adjusting thresholds
 p_qc <- VlnPlot(
-  merge(xen_0dpa, list(xen_3dpa, xen_pool, xen_14dpa, xen_late)),
+  merge(xen_BL0, list(xen_FACS_BL0, xen_BL3, xen_FACS_BL3, xen_pool,
+                      xen_14dpa, xen_late, xen_LBst50, xen_LBst51, xen_LBst52)),
   features = c("nFeature_RNA","nCount_RNA","percent.mt"),
   ncol = 3, pt.size = 0
 )
-pdf(file.path(results_dir, "xenopus_qc_violin_prefilter.pdf"), width = 18, height = 4)
+pdf(file.path(results_dir, "xenopus_qc_violin_prefilter.pdf"), width = 24, height = 4)
 print(p_qc)
 dev.off()
-message("QC violin saved — inspect before adjusting thresholds below")
+message("QC violin saved — inspect xenopus_qc_violin_prefilter.pdf before adjusting thresholds")
 
-# Thresholds for original three samples established from violin plots.
-# Thresholds for xen_14dpa and xen_late are conservative starting points —
-# inspect xenopus_qc_violin_prefilter.pdf and adjust if needed.
-xen_0dpa  <- subset(xen_0dpa,  nFeature_RNA > 500 & nFeature_RNA < 8000  & percent.mt < 20)
-xen_3dpa  <- subset(xen_3dpa,  nFeature_RNA > 500 & nFeature_RNA < 12000 & percent.mt < 20)
-xen_pool  <- subset(xen_pool,  nFeature_RNA > 500 & nFeature_RNA < 10000 & percent.mt < 20)
-xen_14dpa <- subset(xen_14dpa, nFeature_RNA > 500 & nFeature_RNA < 10000 & percent.mt < 20)
-xen_late  <- subset(xen_late,  nFeature_RNA > 500 & nFeature_RNA < 10000 & percent.mt < 20)
+# BL thresholds: conservative starting point — inspect violin and adjust
+xen_BL0      <- subset(xen_BL0,      nFeature_RNA > 500 & nFeature_RNA < 8000  & percent.mt < 20)
+xen_FACS_BL0 <- subset(xen_FACS_BL0, nFeature_RNA > 500 & nFeature_RNA < 8000  & percent.mt < 20)
+xen_BL3      <- subset(xen_BL3,      nFeature_RNA > 500 & nFeature_RNA < 12000 & percent.mt < 20)
+xen_FACS_BL3 <- subset(xen_FACS_BL3, nFeature_RNA > 500 & nFeature_RNA < 12000 & percent.mt < 20)
+xen_pool     <- subset(xen_pool,     nFeature_RNA > 500 & nFeature_RNA < 10000 & percent.mt < 20)
+xen_14dpa    <- subset(xen_14dpa,    nFeature_RNA > 500 & nFeature_RNA < 10000 & percent.mt < 20)
+xen_late     <- subset(xen_late,     nFeature_RNA > 500 & nFeature_RNA < 10000 & percent.mt < 20)
 
+# LBst thresholds: same conservative window — inspect violin and adjust
+xen_LBst50 <- subset(xen_LBst50, nFeature_RNA > 500 & nFeature_RNA < 10000 & percent.mt < 20)
+xen_LBst51 <- subset(xen_LBst51, nFeature_RNA > 500 & nFeature_RNA < 10000 & percent.mt < 20)
+xen_LBst52 <- subset(xen_LBst52, nFeature_RNA > 500 & nFeature_RNA < 10000 & percent.mt < 20)
+
+message("Post-QC cells:")
 message(sprintf(
-  "Post-QC cells — 0dpa: %d | 3dpa: %d | 7-14dpa: %d | 14dpa: %d | 14-52dpa: %d",
-  ncol(xen_0dpa), ncol(xen_3dpa), ncol(xen_pool),
-  ncol(xen_14dpa), ncol(xen_late)
+  "  BL  : BL0=%d | FACS_BL0=%d | BL3=%d | FACS_BL3=%d | pool=%d | 14dpa=%d | late=%d",
+  ncol(xen_BL0), ncol(xen_FACS_BL0), ncol(xen_BL3), ncol(xen_FACS_BL3),
+  ncol(xen_pool), ncol(xen_14dpa), ncol(xen_late)
 ))
-# Original expected: 3,869 | 5,251 | 10,828
+message(sprintf("  LBst: NF50=%d | NF51=%d | NF52=%d",
+  ncol(xen_LBst50), ncol(xen_LBst51), ncol(xen_LBst52)
+))
 
 # =============================================================================
 # 3. ADD METADATA
 # =============================================================================
 
-xen_0dpa$timepoint  <- "0dpa";     xen_0dpa$sample  <- "Xen_BL0dpa"
-xen_3dpa$timepoint  <- "3dpa";     xen_3dpa$sample  <- "Xen_BL3dpa"
-xen_pool$timepoint  <- "7-14dpa";  xen_pool$sample  <- "Xen_Pool_7-14dpa"
-xen_14dpa$timepoint <- "14dpa";    xen_14dpa$sample <- "Xen_BL14dpa"
-xen_late$timepoint  <- "14-52dpa"; xen_late$sample  <- "Xen_Pool_14-52dpa"
+# condition: "BL" = froglet blastema (non-regenerative)
+#            "LBst" = tadpole limb bud stage (regenerative)
+# timepoint: dpa label for BL; NF stage for LBst
 
-# Direct assignment required — R for-loop copies don't write back to originals
-xen_0dpa$species  <- "Xenopus"
-xen_3dpa$species  <- "Xenopus"
-xen_pool$species  <- "Xenopus"
-xen_14dpa$species <- "Xenopus"
-xen_late$species  <- "Xenopus"
+set_meta <- function(seu, condition, timepoint, sample) {
+  seu$condition <- condition
+  seu$timepoint <- timepoint
+  seu$sample    <- sample
+  seu$species   <- "Xenopus"
+  seu
+}
+
+xen_BL0      <- set_meta(xen_BL0,      "BL",   "0dpa",     "Xen_BL0dpa")
+xen_FACS_BL0 <- set_meta(xen_FACS_BL0, "BL",   "0dpa",     "Xen_FACS_BL0dpa")
+xen_BL3      <- set_meta(xen_BL3,      "BL",   "3dpa",     "Xen_BL3dpa")
+xen_FACS_BL3 <- set_meta(xen_FACS_BL3, "BL",   "3dpa",     "Xen_FACS_BL3dpa")
+xen_pool     <- set_meta(xen_pool,     "BL",   "7-14dpa",  "Xen_Pool_BL7_10_14dpa")
+xen_14dpa    <- set_meta(xen_14dpa,    "BL",   "14dpa",    "Xen_BL14dpa")
+xen_late     <- set_meta(xen_late,     "BL",   "14-52dpa", "Xen_Pool_BL14_20_52dpa")
+xen_LBst50   <- set_meta(xen_LBst50,  "LBst", "NF50",     "Xen_LBst50")
+xen_LBst51   <- set_meta(xen_LBst51,  "LBst", "NF51",     "Xen_LBst51")
+xen_LBst52   <- set_meta(xen_LBst52,  "LBst", "NF52",     "Xen_LBst52")
 
 # =============================================================================
 # 4. MERGE + HARMONY INTEGRATION
-# The original 3 samples (GSM5045xxx) and the 2 new samples (GSM5057xxx) are
-# from different GEO submissions and require batch correction. Harmony is run
-# on sample identity (group.by.vars = "sample"), matching the approach used
-# for the Leigh 2018 axolotl multi-study integration.
+#
+# 10 samples across two GEO submissions and two experimental conditions.
+# Harmony corrects for library-level batch effects (group.by.vars = "sample").
+# The condition and timepoint metadata survive batch correction — Harmony
+# only adjusts the PCA embedding, not the expression values.
 # =============================================================================
 
-message("Merging Xenopus objects...")
+message("Merging all Xenopus objects...")
 xen_merged <- merge(
-  xen_0dpa,
-  y            = list(xen_3dpa, xen_pool, xen_14dpa, xen_late),
-  add.cell.ids = c("0dpa","3dpa","pool","14dpa","late"),
-  project      = "XenopusRegen"
+  xen_BL0,
+  y = list(xen_FACS_BL0, xen_BL3, xen_FACS_BL3, xen_pool,
+           xen_14dpa, xen_late, xen_LBst50, xen_LBst51, xen_LBst52),
+  add.cell.ids = c("BL0","FACS_BL0","BL3","FACS_BL3","pool",
+                   "14dpa","late","LBst50","LBst51","LBst52"),
+  project = "XenopusRegen"
 )
 
 xen_merged <- JoinLayers(xen_merged)
 xen_merged$timepoint <- factor(xen_merged$timepoint, levels = TIMEPOINT_ORDER)
+xen_merged$condition <- factor(xen_merged$condition, levels = c("BL","LBst"))
 
 message("Total merged cells: ", ncol(xen_merged))
+print(table(xen_merged$condition, xen_merged$timepoint))
 
 # =============================================================================
 # 5. NORMALISE, HVG, SCALE, PCA
 # =============================================================================
 
-message("Normalising, integrating, and clustering...")
+message("Normalising and running PCA...")
 xen_merged <- NormalizeData(xen_merged)
 xen_merged <- FindVariableFeatures(xen_merged, nfeatures = 2000)
 xen_merged <- ScaleData(xen_merged)
@@ -161,7 +224,7 @@ xen_merged <- RunHarmony(
 )
 
 # =============================================================================
-# 6. CLUSTERING + UMAP on Harmony embedding
+# 6. CLUSTERING + UMAP
 # =============================================================================
 
 xen_merged <- FindNeighbors(xen_merged, reduction = "harmony", dims = 1:20)
@@ -175,21 +238,26 @@ xen_merged@misc$default_reduction <- "umap_harmony"
 
 message("Clusters: ", length(unique(Idents(xen_merged))))
 message("Total cells: ", ncol(xen_merged))
-print(table(xen_merged$timepoint))
+print(table(xen_merged$condition, xen_merged$timepoint))
 
+# UMAP by cluster
 pdf(file.path(results_dir, "xenopus_umap_clusters.pdf"), width = 8, height = 6)
 print(DimPlot(xen_merged, reduction = "umap_harmony", label = TRUE, repel = TRUE) +
         ggtitle("Xenopus - Seurat clusters (res=0.3)"))
 dev.off()
 
+# UMAP by timepoint (BL shades of blue/purple; LBst shades of green)
 pdf(file.path(results_dir, "xenopus_umap_timepoint.pdf"), width = 10, height = 6)
-print(DimPlot(xen_merged, reduction = "umap_harmony", group.by = "timepoint", pt.size = 0.4,
-              cols = c("0dpa"     = "#2E7D32",
-                       "3dpa"     = "#00838F",
-                       "7-14dpa"  = "#1565C0",
-                       "14dpa"    = "#6A1B9A",
-                       "14-52dpa" = "#B71C1C")) +
+print(DimPlot(xen_merged, reduction = "umap_harmony", group.by = "timepoint",
+              cols = TIMEPOINT_COLORS, pt.size = 0.4) +
         ggtitle("Xenopus - by timepoint"))
+dev.off()
+
+# UMAP by condition — shows BL vs LBst separation
+pdf(file.path(results_dir, "xenopus_umap_condition.pdf"), width = 8, height = 6)
+print(DimPlot(xen_merged, reduction = "umap_harmony", group.by = "condition",
+              cols = c("BL" = "#1565C0", "LBst" = "#2E7D32"), pt.size = 0.4) +
+        ggtitle("Xenopus - BL (froglet, non-regen) vs LBst (tadpole, regen)"))
 dev.off()
 
 saveRDS(xen_merged, file.path(results_dir, "xen_merged.rds"))
