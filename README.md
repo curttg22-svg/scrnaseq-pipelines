@@ -7,8 +7,8 @@ Single-cell RNA-seq analysis pipelines for *Xenopus laevis* and *Ambystoma mexic
 
 | Folder | Species | Dataset | Accession |
 |--------|---------|---------|-----------|
-| `xenopus/` | *X. laevis* | Gerber et al. 2021 | GEO GSE165901 |
-| `axolotl-gerber-2021/` | *A. mexicanum* | Gerber et al. 2021 (CT fate-map, 11 dpa) | GEO GSE165901 |
+| `xenopus/` | *X. laevis* | Lin et al. 2021 (Dev. Cell) | GEO GSE165901 |
+| `axolotl-gerber-2021/` | *A. mexicanum* | Gerber et al. 2018 (Science) CT fate-map, 11 dpa | GEO GSE106269 |
 | `axolotl-leigh-2018/` | *A. mexicanum* | Leigh et al. 2018 (Intact → WH → EB → MB) | GEO GSE121737 / SCP422 |
 
 ## Workflow

@@ -63,10 +63,12 @@ message("AMEX IDs with clean gene symbol: ", nrow(gtf_map))
 # Expected: ~24,811 (2 unmapped are ERCC spike-ins)
 
 # =============================================================================
-# 3. EXTEND BRIDGE FOR XENOPUS ORTHOLOGS
-# Uses axolotl-xenopus orthologs from ENSEMBL where available.
-# The simplified bridge uses the human symbol as a common key to link
-# AMEX IDs back to Xenopus laevis homeolog names.
+# 3. FINALISE BRIDGE
+# Renames the gene_symbol column to amex_symbol for consistent naming
+# across downstream scripts (06_goi_visualization.R checks for amex_symbol).
+# Cross-species ortholog extension (AMEX -> Xenopus homeolog) is not
+# implemented here — the human gene symbol is used as the common key
+# when comparing across species in 06_goi_visualization.R.
 # =============================================================================
 
 final_bridge <- gtf_map |>

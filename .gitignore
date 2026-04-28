@@ -61,3 +61,6 @@ rsconnect/
 **/results/*.pdf
 **/results/*.png
 **/data/raw/
+
+# Regenerable script output — not inputs, do not track in git (see PR #71)
+axolotl-leigh-2018/helper/trinity_to_symbol_map.csv

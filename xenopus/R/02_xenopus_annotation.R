@@ -3,7 +3,7 @@
 # Input:  results/xen_merged.rds
 # Output: results/xen_merged.rds (updated with cell_type metadata)
 #
-# 22 clusters at resolution=0.3 (five timepoints: 0/3/7-14/14/14-52 dpa,
+# 20 clusters at resolution=0.3 (five timepoints: 0/3/7-14/14/14-52 dpa,
 # Harmony-integrated across two GEO batches: GSM5045xxx + GSM5057xxx)
 #
 # Annotation strategy: marker-based verification via canonical dotplot.
@@ -61,10 +61,11 @@ xen_merged <- RenameIdents(xen_merged,
   # Vascular / other
   "13" = "Endothelial",           # pecam1, cdh5 — only cluster with pecam1
   "14" = "Erythrocyte",           # hba1 — verify with hba1 panel (col1a1 signal needs check)
-  "21" = "Erythrocyte_2",         # hba1 + krt18 — small late-stage cluster
   # Neural
-  "15" = "Neural_crest",          # sox10 — larger neural cluster
-  "20" = "Neuron"                 # sox10 — smaller neural cluster (new timepoints)
+  "15" = "Neural_crest"           # sox10 — larger neural cluster
+  # Note: clusters 20 and 21 (Neuron, Erythrocyte_2) were phantom assignments
+  # confirmed to have 0 cells in both the V2 object and the current integration.
+  # Resolution=0.3 consistently produces 20 clusters (0-19) for this dataset.
 )
 
 xen_merged$cell_type <- Idents(xen_merged)
@@ -123,8 +124,8 @@ CT_ORDER <- c(
   "CT_fibroblast_A","CT_fibroblast_B",
   "CT_cartilage_assoc",
   "Proliferating_A","Proliferating_B",
-  "Neural_crest","Neural_2","Schwann_cell","Neuron",
-  "Erythrocyte","Erythrocyte_2"
+  "Neural_crest","Neural_2","Schwann_cell",
+  "Erythrocyte"
 )
 xen_merged$cell_type <- factor(as.character(xen_merged$cell_type), levels = CT_ORDER)
 Idents(xen_merged)   <- xen_merged$cell_type
