@@ -193,7 +193,11 @@ xen_merged <- merge(
   project = "XenopusRegen"
 )
 
-xen_merged <- JoinLayers(xen_merged)
+# Free individual objects immediately to reclaim RAM before heavy steps
+rm(xen_BL0, xen_FACS_BL0, xen_BL3, xen_FACS_BL3, xen_pool,
+   xen_14dpa, xen_late, xen_LBst50, xen_LBst51, xen_LBst52, all_objs)
+gc()
+
 xen_merged$timepoint <- factor(xen_merged$timepoint, levels = TIMEPOINT_ORDER)
 xen_merged$condition <- factor(xen_merged$condition, levels = c("BL","LBst"))
 
@@ -207,12 +211,14 @@ print(table(xen_merged$condition, xen_merged$timepoint))
 message("Normalising and running PCA...")
 xen_merged <- NormalizeData(xen_merged)
 xen_merged <- FindVariableFeatures(xen_merged, nfeatures = 2000)
-xen_merged <- ScaleData(xen_merged)
+xen_merged <- ScaleData(xen_merged, features = VariableFeatures(xen_merged))
 xen_merged <- RunPCA(xen_merged, npcs = 30)
 
 pdf(file.path(results_dir, "xenopus_elbow_plot.pdf"), width = 6, height = 4)
 print(ElbowPlot(xen_merged, ndims = 30))
 dev.off()
+
+gc()  # free dense scale.data matrix before Harmony
 
 message("Running Harmony (batch correction by sample)...")
 xen_merged <- RunHarmony(
@@ -222,6 +228,8 @@ xen_merged <- RunHarmony(
   reduction.save = "harmony",
   verbose        = FALSE
 )
+# JoinLayers is intentionally deferred to 02_xenopus_annotation.R so that
+# script 01 never needs to hold split + joined layers simultaneously.
 
 # =============================================================================
 # 6. CLUSTERING + UMAP
@@ -259,6 +267,11 @@ print(DimPlot(xen_merged, reduction = "umap_harmony", group.by = "condition",
               cols = c("BL" = "#1565C0", "LBst" = "#2E7D32"), pt.size = 0.4) +
         ggtitle("Xenopus - BL (froglet, non-regen) vs LBst (tadpole, regen)"))
 dev.off()
+
+# Drop heavy layers before saving — counts and scale.data not needed after PCA/clustering
+xen_merged[["RNA"]]$scale.data <- NULL
+xen_merged[["RNA"]]$counts     <- NULL
+gc()
 
 saveRDS(xen_merged, file.path(results_dir, "xen_merged.rds"))
 message("Saved results/xen_merged.rds")

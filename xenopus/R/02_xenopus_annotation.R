@@ -3,7 +3,7 @@
 # Input:  results/xen_merged.rds
 # Output: results/xen_merged.rds (updated with cell_type metadata)
 #
-# 20 clusters at resolution=0.3 (five timepoints: 0/3/7-14/14/14-52 dpa,
+# 21 clusters at resolution=0.3 (10 samples: BL 0/3/7-14/14/14-52 dpa + LBst NF50/51/52,
 # Harmony-integrated across two GEO batches: GSM5045xxx + GSM5057xxx)
 #
 # Annotation strategy: marker-based verification via canonical dotplot.
@@ -29,46 +29,49 @@ library(ggplot2)
 
 results_dir <- "results"
 xen_merged  <- readRDS(file.path(results_dir, "xen_merged.rds"))
+Idents(xen_merged) <- xen_merged$seurat_clusters   # reset to cluster numbers
 
 # =============================================================================
 # 1. ASSIGN CELL TYPE LABELS
-# Clusters determined at resolution=0.3 (20 clusters, 0-19)
+# Clusters determined at resolution=0.3 (21 clusters, 0-20)
 # Evidence: canonical marker dotplot (see below)
+# All labels re-verified after full 10-sample re-integration (BL + LBst)
 # =============================================================================
 
 xen_merged <- RenameIdents(xen_merged,
-  # CT / stromal subtypes (col1a1/vim dominant; acta2/tagln distinguish muscle)
-  "0"  = "CT_fibroblast_A",       # col1a1, vim, tagln, acta2
-  "2"  = "CT_fibroblast_B",       # col1a1, vim, tagln, acta2
-  "3"  = "Epithelial_mixed",      # epcam dominant — dotplot shows epithelial not CT (corrected)
-  "4"  = "Smooth_muscle",         # col1a1, vim, acta2, tagln
-  "12" = "Schwann_cell",          # sox10 dominant — dotplot shows neural/Schwann not tendon (corrected)
-  "16" = "CT_cartilage_assoc",    # col2a1 — verify with hba1 panel (see canonical_markers below)
+  # CT / stromal fibroblasts (col1a1/vim dominant; no acta2/tagln)
+  "0"  = "CT_fibroblast_A",       # col1a1.L/S, vim.L strong
+  "1"  = "CT_fibroblast_B",       # col1a1.L/S, vim.L strong
+  "3"  = "CT_fibroblast_C",       # col1a1.L/S, vim.L
+  "7"  = "CT_fibroblast_D",       # col1a1.L/S, vim.L
+  "18" = "CT_fibroblast_E",       # col1a1.L/S, vim.L very strong (likely LBst CT)
+  # Cartilage-associated
+  "6"  = "CT_cartilage_assoc",    # col2a1.L, sox9.L dominant
+  "15" = "CT_perichondrial",      # col1a1 + col2a1/sox9 moderate
+  # Smooth muscle
+  "13" = "Smooth_muscle",         # acta2.L, tagln.L very dominant
   # Epithelial
-  "1"  = "Keratinocyte",          # epcam — strongest epithelial cluster
-  "5"  = "Basal_epithelial",      # epcam, krt17, vim mix
-  "8"  = "CT_progenitor",         # epcam, krt17 — progenitor-like mixed profile
-  "10" = "Keratinocyte_2",        # krt17, epcam — top krt17 expression
-  "18" = "Neural_2",              # sox10 dominant — dotplot shows neural not epithelial (corrected)
-  "19" = "Keratinocyte_3",        # krt8, krt18 dominant — dotplot shows epithelial not osteoblast (corrected)
+  "2"  = "Keratinocyte",          # epcam.L very dominant
+  "5"  = "CT_progenitor",         # epcam moderate + col2a1/sox9 — progenitor-like
+  "8"  = "Epithelial_mixed",      # krt8.L, epcam.L
   # Immune
-  "6"  = "Macrophage",            # ptprc — largest immune cluster
-  "11" = "Neutrophil",            # ptprc, mki67 — cycling immune
-  "17" = "Macrophage_2",          # ptprc — second macrophage subtype
+  "10" = "Macrophage",            # ptprc.L very dominant
+  "11" = "Macrophage_2",          # ptprc.L moderate
+  # Vascular
+  "12" = "Endothelial",           # pecam1.L, cdh5.L dominant
+  # Erythrocyte
+  "9"  = "Erythrocyte",           # hba1.L very dominant
+  "14" = "Erythrocyte_2",         # hba1.L large + epcam moderate — re-verify
+  "20" = "Erythrocyte_LBst",      # hba1.L dominant + col1a1/ptprc — flag for re-verify
   # Proliferating
-  "7"  = "Proliferating_A",       # top2a, tagln — proliferating CT
-  "9"  = "Proliferating_B",       # epcam, top2a — proliferating epithelial
-  # Vascular / other
-  "13" = "Endothelial",           # pecam1, cdh5 — only cluster with pecam1
-  "14" = "Erythrocyte",           # hba1 — verify with hba1 panel (col1a1 signal needs check)
-  # Neural
-  "15" = "Neural_crest"           # sox10 — larger neural cluster
-  # Note: clusters 20 and 21 (Neuron, Erythrocyte_2) were phantom assignments
-  # confirmed to have 0 cells in both the V2 object and the current integration.
-  # Resolution=0.3 consistently produces 20 clusters (0-19) for this dataset.
+  "4"  = "Proliferating_A",       # mki67.L, top2a.L + col1a1 — proliferating CT
+  "17" = "Proliferating_B",       # mki67.L, top2a.L dominant
+  # Neural / Schwann
+  "16" = "Neural_crest",          # sox10.L very dominant
+  "19" = "Schwann_cell"           # vim.L + sox10.L
 )
 
-xen_merged$cell_type <- Idents(xen_merged)
+xen_merged@meta.data[["cell_type"]] <- as.character(Idents(xen_merged))
 
 # =============================================================================
 # 2. CANONICAL MARKER DOTPLOT — evidence for annotations
@@ -117,15 +120,15 @@ dev.off()
 # =============================================================================
 
 CT_ORDER <- c(
-  "Keratinocyte","Keratinocyte_2","Keratinocyte_3","Basal_epithelial","Epithelial_mixed",
-  "CT_progenitor",
-  "Macrophage","Macrophage_2","Neutrophil",
-  "Endothelial","Smooth_muscle",
-  "CT_fibroblast_A","CT_fibroblast_B",
-  "CT_cartilage_assoc",
+  "Keratinocyte","Epithelial_mixed","CT_progenitor",
+  "CT_fibroblast_A","CT_fibroblast_B","CT_fibroblast_C","CT_fibroblast_D","CT_fibroblast_E",
+  "CT_cartilage_assoc","CT_perichondrial",
+  "Smooth_muscle",
+  "Macrophage","Macrophage_2",
+  "Endothelial",
+  "Erythrocyte","Erythrocyte_2","Erythrocyte_LBst",
   "Proliferating_A","Proliferating_B",
-  "Neural_crest","Neural_2","Schwann_cell",
-  "Erythrocyte"
+  "Neural_crest","Schwann_cell"
 )
 xen_merged$cell_type <- factor(as.character(xen_merged$cell_type), levels = CT_ORDER)
 Idents(xen_merged)   <- xen_merged$cell_type
