@@ -176,7 +176,7 @@ make_scatter <- function(bm) {
   bulk_label  <- bm$bulk_cond
   scrna_label <- bm$best_col
 
-  ggplot(df, aes(x = bulk, y = scrna)) +
+  ggplot(df, aes(x = log1p(bulk), y = scrna)) +
     geom_point(alpha = 0.25, size = 0.6, color = "#546E7A") +
     geom_smooth(method = "lm", se = FALSE, color = "#D32F2F",
                 linewidth = 0.8, linetype = "solid") +
@@ -189,7 +189,7 @@ make_scatter <- function(bm) {
              hjust = -0.1, vjust = 1.3, size = 3.5, fontface = "bold") +
     labs(
       title    = sprintf("%s vs %s", bulk_label, scrna_label),
-      x        = "Bulk RNA-seq (log-normalized, mean)",
+      x        = "Bulk RNA-seq (log1p normalized counts)",
       y        = "scRNA-seq pseudobulk (mean log-norm)"
     ) +
     theme_bw(base_size = 11) +
