@@ -59,7 +59,7 @@ source("R/utils_harmonize.R")
 BULK_DIR  <- "~/Desktop/All RNA normlized count csv files"
 AXO_RDS   <- "~/Desktop/Axolotl_scrnaseq_project_V3/results/axo_integrated.rds"
 XEN_RDS   <- "~/Desktop/scrnaseq-pipelines/xenopus/results/xen_merged.rds"
-# MOUSE_RDS <- "~/path/to/mouse_digit.rds"   # set when dataset is available
+MOUSE_RDS <- "~/Desktop/scrnaseq-pipelines/mouse-digit/results/mouse_merged.rds"
 
 RESULTS_DIR <- "results"
 dir.create(RESULTS_DIR, showWarnings = FALSE)
@@ -122,9 +122,19 @@ message("Bulk: ", nrow(bulk_mat), " HGNC genes x ", ncol(bulk_mat), " conditions
 
 # --- Axolotl Leigh 2018 (Trinity assembly, SwissProt-annotated names) -------
 
+# Strip counts and scale.data before JoinLayers to halve peak RAM
+.slim_for_pseudobulk <- function(obj) {
+  for (l in Layers(obj)[startsWith(Layers(obj), "counts.")])
+    LayerData(obj, layer = l) <- NULL
+  for (l in Layers(obj)[startsWith(Layers(obj), "scale.data")])
+    LayerData(obj, layer = l) <- NULL
+  gc()
+  JoinLayers(obj)
+}
+
 pseudobulk_axolotl_leigh <- function(rds_path) {
   message("Computing pseudobulk: Axolotl (Leigh 2018)...")
-  axo    <- JoinLayers(readRDS(rds_path))
+  axo    <- .slim_for_pseudobulk(readRDS(rds_path))
   expr   <- GetAssayData(axo, layer = "data")
 
   # Pool WH_N4/N5/N6 replicates into a single "WH" timepoint
@@ -159,7 +169,7 @@ pseudobulk_axolotl_leigh <- function(rds_path) {
 
 pseudobulk_xenopus_lin <- function(rds_path) {
   message("Computing pseudobulk: Xenopus (Lin 2021)...")
-  xen  <- JoinLayers(readRDS(rds_path))
+  xen  <- .slim_for_pseudobulk(readRDS(rds_path))
   expr <- GetAssayData(xen, layer = "data")
 
   # Sum .L and .S homeologs into one base-gene symbol per cell using a sparse
@@ -195,26 +205,20 @@ pseudobulk_xenopus_lin <- function(rds_path) {
   as.matrix(cbind(pb_bl, pb_lb))
 }
 
-# --- Mouse digit tip (placeholder — fill in when dataset is available) ------
-#
-# pseudobulk_mouse_digit <- function(rds_path,
-#                                     tp_var   = "timepoint",
-#                                     tp_order = NULL,
-#                                     prefix   = "Mouse") {
-#   message("Computing pseudobulk: Mouse digit tip...")
-#   mus      <- JoinLayers(readRDS(rds_path))
-#   expr     <- GetAssayData(mus, layer = "data")
-#   tp_vals  <- mus[[tp_var, drop = TRUE]]
-#   if (is.null(tp_order)) tp_order <- levels(factor(tp_vals))
-#   tp_factor <- factor(tp_vals, levels = tp_order)
-#
-#   pb <- .mean_per_tp(expr, tp_factor, tp_order, prefix = prefix)
-#
-#   # toupper() handles ~95%+ of mouse-human symbol pairs (same symbol,
-#   # different capitalization). Genuine symbol divergences fall out at
-#   # the intersection step — acceptable for transcriptome-wide Spearman.
-#   aggregate_to_hgnc(as.matrix(pb), species = "mouse")
-# }
+# --- Mouse digit tip (Storer et al. 2020, GSE143888) ------------------------
+
+pseudobulk_mouse_digit <- function(rds_path) {
+  message("Computing pseudobulk: Mouse digit tip (Storer 2020)...")
+  mus      <- .slim_for_pseudobulk(readRDS(rds_path))
+  expr     <- GetAssayData(mus, layer = "data")
+  tp_order  <- c("0dpa","11dpa","12dpa","14dpa","17dpa")
+  tp_factor <- factor(mus$timepoint, levels = tp_order)
+
+  pb <- .mean_per_tp(expr, tp_factor, tp_order, prefix = "Mouse")
+  message("  Mouse: ", ncol(expr), " cells x ", nrow(expr), " genes")
+
+  aggregate_to_hgnc(as.matrix(pb), species = "mouse")
+}
 
 # =============================================================================
 # 4. BUILD PSEUDOBULK LIST
@@ -223,14 +227,8 @@ pseudobulk_xenopus_lin <- function(rds_path) {
 
 pseudos <- list(
   "Axolotl (Leigh 2018)" = pseudobulk_axolotl_leigh(AXO_RDS),
-  "Xenopus (Lin 2021)"   = pseudobulk_xenopus_lin(XEN_RDS)
-  # Add mouse dataset when available:
-  # "Mouse digit tip" = pseudobulk_mouse_digit(
-  #   MOUSE_RDS,
-  #   tp_var   = "timepoint",               # adjust to match metadata column
-  #   tp_order = c("Intact","3dpa","7dpa","14dpa"),  # adjust to actual levels
-  #   prefix   = "Mouse"
-  # )
+  "Xenopus (Lin 2021)"   = pseudobulk_xenopus_lin(XEN_RDS),
+  "Mouse digit tip"      = pseudobulk_mouse_digit(MOUSE_RDS)
 )
 
 # =============================================================================
