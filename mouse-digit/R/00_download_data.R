@@ -2,8 +2,11 @@
 # 00 — Download raw data from GEO (GSE143888)
 # Run once from the mouse-digit/ project root: source("R/00_download_data.R")
 #
-# Storer et al. 2020 (Dev Cell) — Mouse digit tip regeneration
-# Adult mouse digit tips (P2-P5), distal phalanx amputation model
+# Johnson, Masias & Lehoczky 2020 (Dev Cell) — PMID 32097654
+# "Cellular Heterogeneity and Lineage Restriction during Mouse Digit Tip
+#  Regeneration at Single-Cell Resolution"
+# Lehoczky lab, Brigham and Women's Hospital / Harvard
+# Adult mouse digit tips, distal phalanx amputation model
 # Regenerative: mouse digit tip CAN regenerate at the distal phalanx
 #
 # 5 samples: unamputated control + 4 post-amputation timepoints

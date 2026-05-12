@@ -4,7 +4,7 @@
 # Input:  data/raw/  (5 samples — run 00_download_data.R first)
 # Output: results/mouse_merged.rds
 #
-# Storer et al. 2020 (Dev Cell) — GSE143888
+# Johnson, Masias & Lehoczky 2020 (Dev Cell) — GSE143888  PMID 32097654
 # Adult mouse digit tip regeneration (distal phalanx amputation)
 #
 # Samples:
