@@ -79,6 +79,11 @@ Rplots.pdf
 ~$*.pptx
 ~$*.xlsx
 
+# Presentation files — personal, not part of the analysis pipeline
+*.pptx
+PRESENTATION*.md
+NARRATIVE*.md
+
 # Run logs and download logs (generated, not source)
 **/results/*.log
 **/results/*.txt
