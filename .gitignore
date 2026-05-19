@@ -58,9 +58,30 @@ rsconnect/
 *.csv.gz
 *.txt.gz
 *.Matrix.txt.gz
+**/results/**/*.pdf
 **/results/*.pdf
+**/results/**/*.png
 **/results/*.png
 **/data/raw/
 
+# Generated figures (PNGs/PDFs — regenerable from scripts)
+**/figures/
+
+# Reference data and pipeline indices (large, not source code)
+comparison/data/
+
 # Regenerable script output — not inputs, do not track in git (see PR #71)
 axolotl-leigh-2018/helper/trinity_to_symbol_map.csv
+
+# macOS and temp files
+.DS_Store
+Rplots.pdf
+~$*.pptx
+~$*.xlsx
+
+# Run logs and download logs (generated, not source)
+**/results/*.log
+**/results/*.txt
+
+# Raw data directories (downloaded, not source code)
+xenopus/data
